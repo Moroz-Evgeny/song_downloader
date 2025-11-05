@@ -8,7 +8,6 @@ def search_song_with_soundcloud_sync(query: str) -> Union[dict, None]:
             'quiet': True,
             'extract_flat': True,
             'default_search': 'scsearch',
-            'proxy': 'socks5://nY5CwB:ZcMEw6@45.130.129.232:8000',
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },

@@ -24,7 +24,6 @@ def download_song_sync(video_url: str, filepath: str):
             'outtmpl': temp_path,
             'quiet': True,
             # Использование прокси с аутентификацией
-            'proxy': 'socks5://nY5CwB:ZcMEw6@45.130.129.232:8000',
             'use_proxy': True,
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',

@@ -19,7 +19,6 @@ def search_song_with_youtube_sync(query: str) -> Union[dict, None]:
             'default_search': 'ytsearch',
             'no_warnings': True,
             'ignoreerrors': True,
-            'proxy': 'socks5://nY5CwB:ZcMEw6@45.130.129.232:8000',
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },
