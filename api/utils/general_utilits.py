@@ -1,4 +1,5 @@
 import os, yt_dlp, asyncio
+import time
 from schemas import DownloadHistoryCreate
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.dal import DownloadHistoryDAL
@@ -23,18 +24,24 @@ def download_song_sync(video_url: str, filepath: str):
             'noplaylist': True,
             'outtmpl': temp_path,
             'quiet': True,
-            # Пробуем разные подходы
-            'extractor_args': {
-                'youtube': {
-                    'skip': ['dash', 'hls'],
-                }
-            },
-            # Форсируем использование определенных экстракторов
-            'allowed_extractors': ['youtube', 'generic'],
-            # Добавляем задержки между запросами
-            'sleep_interval': 2,
+            # Кэшировать результаты
+            'cachedir': '/tmp/yt_dlp_cache',
+            # Случайные задержки
+            'sleep_interval': random.randint(1, 3),
             'max_sleep_interval': 5,
         }
+
+        # Пробуем несколько раз с разными настройками
+        for attempt in range(3):
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([video_url])
+                break
+            except Exception as e:
+                if attempt == 2:  # последняя попытка
+                    raise e
+                print(f"Попытка {attempt + 1} не удалась, пробуем снова...")
+                time.sleep(2)
 
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
