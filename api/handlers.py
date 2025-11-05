@@ -56,24 +56,4 @@ async def download_music(query: str, background_tasks: BackgroundTasks, db: Asyn
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@download_router.get("/test-soundcloud")
-async def test_soundcloud(query: str = "test music"):
-    """Тестовый эндпоинт для проверки SoundCloud"""
-    try:
-        result = await _search_song_with_soundcloud(query)
-        if result:
-            return {
-                "status": "success",
-                "track": result,
-                "message": "SoundCloud работает нормально"
-            }
-        else:
-            return {
-                "status": "error", 
-                "message": "Не удалось найти трек на SoundCloud"
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Ошибка SoundCloud: {str(e)}"
-        }
+
