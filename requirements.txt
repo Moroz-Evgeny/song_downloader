@@ -1,7 +1,7 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 sqlalchemy==2.0.23
-yt-dlp==2023.11.16
+yt-dlp==2023.12.30 
 ytmusicapi==1.0.2
 aiosqlite==0.19.0
 pydantic==2.5.0
