@@ -1,0 +1,15 @@
+version: "3.8"
+services:
+  web:
+    container_name: music_downloader
+    build: .
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./db/downloads_history.db
+      - DOWNLOADS_DIR=temp
+    ports:
+      - "8080:8080"
+    volumes:
+      # Монтируем существующие папки
+      - ./db:/app/db
+      - ./temp:/app/temp
+    restart: unless-stopped
