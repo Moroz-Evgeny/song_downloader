@@ -29,6 +29,7 @@ def download_song_sync(video_url: str, filepath: str):
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },
+            'params': {'client_id': 'i1WGJflNesCYHVXqGUzw4whCQc1NXnWGzapNVbAOZy'}
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
