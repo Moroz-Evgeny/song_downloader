@@ -1,4 +1,5 @@
 import os, yt_dlp, asyncio
+import random
 import time
 from schemas import DownloadHistoryCreate
 from sqlalchemy.ext.asyncio import AsyncSession
