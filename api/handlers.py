@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import FileResponse
-from api.utils.youtube import _search_song_with_youtube
 from api.utils.soundcloud import _search_song_with_soundcloud
 from api.utils.general_utilits import _delete_file, _download_song, _create_history
 from sqlalchemy.ext.asyncio import AsyncSession
