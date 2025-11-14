@@ -9,41 +9,43 @@ stream_router = APIRouter()
 async def stream_track(request: Request, track_id: int):
     """
     Получение URL для потокового воспроизведения
-    с кэшированием и rate limiting
+    Кэшируем только метаданные, stream_url получаем каждый раз свежий
     """
     print(f"Stream request for track_id: {track_id}")
     
     # Проверяем rate limiting
     client_ip = request.client.host
     if await stream_limiter.is_rate_limited(f"stream:{client_ip}"):
-        print(f"Rate limited for IP: {client_ip}")
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Слишком много запросов потокового воспроизведения. Пожалуйста, подождите."
         )
     
-    # Проверяем кэш
-    cached_result = await CacheManager.get_stream_cache(track_id)
-    if cached_result:
-        print(f"Cache HIT for track {track_id}")
-        result = json.loads(cached_result)
-        print(f"Cached result: {result}")
-        return result
+    # Проверяем кэш ТОЛЬКО для метаданных
+    cached_meta = await CacheManager.get_stream_cache(track_id)
     
-    print(f"Cache MISS for track {track_id}")
-    # Получаем stream URL
+    # Всегда получаем свежий stream_url
     result = await _get_stream_url_with_soundcloud(track_id)
     
     if not result:
-        print(f"Track {track_id} not found")
+        # Если трек не найден, но есть кэшированные метаданные - все равно возвращаем ошибку
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Трек не найден или недоступен для потокового воспроизведения"
         )
     
-    print(f"API result: {result}")
+    # Если есть кэшированные метаданные, объединяем их со свежим stream_url
+    if cached_meta:
+        print(f"Using cached metadata for track {track_id}")
+        # Сохраняем свежий stream_url, но используем кэшированные метаданные
+        final_result = json.loads(cached_meta)
+        final_result['stream_url'] = result['stream_url']
+    else:
+        # Сохраняем метаданные в кэш (без stream_url)
+        await CacheManager.set_stream_cache(track_id, json.dumps({
+            'track_info': result.get('track_info', {})
+        }))
+        final_result = result
     
-    # Сохраняем в кэш
-    await CacheManager.set_stream_cache(track_id, json.dumps(result))
-    
-    return result
+    print(f"Returning fresh stream URL for track {track_id}")
+    return final_result

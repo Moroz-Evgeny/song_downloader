@@ -85,8 +85,8 @@ class CacheManager:
 
     @staticmethod
     async def get_stream_cache(track_id: int) -> Optional[Any]:
-        """Получить stream URL из кэша"""
-        cache_key = f"stream:{track_id}"
+        """Получить stream URL из кэша - ТОЛЬКО МЕТАДАННЫЕ, без stream_url"""
+        cache_key = f"stream_meta:{track_id}"
         
         if cache_key in stream_cache:
             return stream_cache[cache_key]
@@ -104,14 +104,21 @@ class CacheManager:
 
     @staticmethod
     async def set_stream_cache(track_id: int, data: Any):
-        """Сохранить stream URL в кэш"""
-        cache_key = f"stream:{track_id}"
+        """Сохранить МЕТАДАННЫЕ трека в кэш (без stream_url)"""
+        cache_key = f"stream_meta:{track_id}"
         
-        stream_cache[cache_key] = data
+        # Удаляем stream_url из данных для кэширования
+        if isinstance(data, dict) and 'stream_url' in data:
+            cache_data = data.copy()
+            del cache_data['stream_url']
+        else:
+            cache_data = data
+        
+        stream_cache[cache_key] = cache_data
         
         if redis_client:
             try:
-                redis_client.setex(cache_key, 1800, data)  # 30 минут
+                redis_client.setex(cache_key, 3600, json.dumps(cache_data))  # 1 час для метаданных
             except Exception as e:
                 print(f"Redis set error: {e}")
 
