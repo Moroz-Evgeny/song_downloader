@@ -1,15 +1,18 @@
+import time
 from fastapi import HTTPException
 import os, asyncio, base64, httpx
 from typing import Union
-from settings import API_URL, CLIENT_ID , CLIENT_SECRET, TOKEN_URL
+from settings import API_URL, CLIENT_ID, CLIENT_SECRET, TOKEN_URL
 
-access_token_cache = None 
+access_token_cache = None
+token_expires_at = 0
 
 async def get_access_token() -> str:
-    """Получение токена через Client Credentials Flow"""
-    global access_token_cache
-
-    if access_token_cache:
+    """Получение токена через Client Credentials Flow с проверкой срока действия"""
+    global access_token_cache, token_expires_at
+    
+    # Проверяем, есть ли валидный токен (с запасом в 5 минут)
+    if access_token_cache and time.time() < token_expires_at - 300:
         return access_token_cache
 
     auth_str = f"{CLIENT_ID}:{CLIENT_SECRET}"
@@ -27,10 +30,19 @@ async def get_access_token() -> str:
         )
 
     if response.status_code != 200:
-        raise HTTPException(status_code=500, detail="Failed to obtain access token")
+        print(f"Token request failed: {response.status_code} - {response.text}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Failed to obtain access token from SoundCloud"
+        )
 
     data = response.json()
     access_token_cache = data["access_token"]
+    
+    # Устанавливаем время истечения токена (обычно 2 часа)
+    token_expires_at = time.time() + data.get("expires_in", 7200)
+    
+    print(f"Successfully obtained new access token, expires at: {token_expires_at}")
     return access_token_cache
 
 async def _search_song_with_soundcloud(query: str, limit: int) -> Union[dict, None]:
