@@ -1,3 +1,4 @@
+import os
 from envparse import Env
 
 env = Env()
@@ -8,3 +9,4 @@ CLIENT_ID = env.str("CLIENT_ID")
 CLIENT_SECRET = env.str("CLIENT_SECRET")
 TOKEN_URL = env.str("TOKEN_URL")
 API_URL = env.str("API_URL")
+REDIS_URL = env.str("REDIS_URL")

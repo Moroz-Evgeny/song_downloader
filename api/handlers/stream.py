@@ -1,19 +1,30 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, status
-from api.utils.soundcloud import get_access_token, _search_song_with_soundcloud, _get_stream_url_with_soundcloud
-from api.utils.general_utilits import _delete_file, _download_song, _create_history
-from sqlalchemy.ext.asyncio import AsyncSession
-from db.database import get_db, init_db
-from schemas import DownloadHistoryCreate
-from settings import DOWNLOADS_DIR
-import os
+from fastapi import APIRouter, HTTPException, Request, status
+from api.utils.soundcloud import _get_stream_url_with_soundcloud
+from api.utils.cache import CacheManager, stream_limiter
+import json
 
 stream_router = APIRouter()
 
 @stream_router.get("/stream/{track_id}")
-async def stream_track(track_id: int):
+async def stream_track(request: Request, track_id: int):
     """
     Получение URL для потокового воспроизведения
+    с кэшированием и rate limiting
     """
+    # Проверяем rate limiting
+    client_ip = request.client.host
+    if await stream_limiter.is_rate_limited(f"stream:{client_ip}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Слишком много запросов потокового воспроизведения. Пожалуйста, подождите."
+        )
+    
+    # Проверяем кэш
+    cached_result = await CacheManager.get_stream_cache(track_id)
+    if cached_result:
+        return json.loads(cached_result)
+    
+    # Получаем stream URL
     result = await _get_stream_url_with_soundcloud(track_id)
     
     if not result:
@@ -21,5 +32,8 @@ async def stream_track(track_id: int):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Трек не найден или недоступен для потокового воспроизведения"
         )
+    
+    # Сохраняем в кэш
+    await CacheManager.set_stream_cache(track_id, json.dumps(result))
     
     return result

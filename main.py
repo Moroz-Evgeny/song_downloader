@@ -30,6 +30,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"], 
 )
+
+@app.on_event("startup")
+async def startup_event():
+    print("Application started with caching and rate limiting")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    print("Application shutting down")
  
 if __name__ == "__main__":
-  uvicorn.run("main:app", host="localhost", port=8080, reload=True, access_log=True)
+  uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True, access_log=True)
