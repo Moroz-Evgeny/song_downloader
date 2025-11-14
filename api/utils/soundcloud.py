@@ -106,8 +106,9 @@ async def _search_song_with_soundcloud(query: str, limit: int) -> Union[dict, No
 async def _get_stream_url_with_soundcloud(track_id: int) -> Union[dict, None]:
     """
     Получение URL для потокового воспроизведения трека
-    Возвращает dict с stream_url и информацией о треке или None при ошибке
     """
+    print(f"Getting stream URL for track {track_id}")
+    
     try:
         token = await get_access_token()
 
@@ -123,6 +124,7 @@ async def _get_stream_url_with_soundcloud(track_id: int) -> Union[dict, None]:
             return None
 
         track_data = track_resp.json()
+        print(f"Track data: {track_data}")
 
         # Проверяем доступность трека
         if track_data.get("access") != "playable":
@@ -135,6 +137,9 @@ async def _get_stream_url_with_soundcloud(track_id: int) -> Union[dict, None]:
                 f"{API_URL}/tracks/{track_id}/stream",
                 headers={"Authorization": f"OAuth {token}"},
             )
+
+        print(f"Stream response status: {stream_resp.status_code}")
+        print(f"Stream response headers: {dict(stream_resp.headers)}")
 
         if stream_resp.status_code == 302:  # Редирект
             # Получаем реальный MP3 URL из заголовка Location
