@@ -48,68 +48,85 @@ async def get_access_token() -> str:
 async def _search_song_with_soundcloud(query: str, limit: int) -> Union[dict, None]:
     """
     Поиск только доступных для потокового воспроизведения треков
+    с повторными попытками при 401 ошибке
     """
-    try:
-        token = await get_access_token()
-
-        params = {
-            "q": query,
-            "limit": limit,
-            "linked_partitioning": "true",
-            "access": "playable"  # Только треки доступные для воспроизведения
-        }
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{API_URL}/tracks",
-                headers={"Authorization": f"OAuth {token}"},
-                params=params,
-            )
-
-        if response.status_code != 200:
-            print(f"SoundCloud API error: {response.status_code} - {response.text}")
-            return None
-
-        data = response.json()
+    max_retries = 2
+    retry_count = 0
     
-        if isinstance(data, dict):
-            if "collection" in data:
-                data = data["collection"]
-            elif "errors" in data: 
-                print(f"SoundCloud API errors: {data.get('errors')}")
-                return None
-        
-        if not isinstance(data, list):
-            print(f"Unexpected data format: {type(data)}")
-            return None
+    while retry_count <= max_retries:
+        try:
+            token = await get_access_token()
 
-        tracks = []
-        for t in data:
-            if isinstance(t, dict) and t.get("access") == "playable" and t.get("id"):
-                artwork_url = t.get("artwork_url")
-                if artwork_url:
-                    artwork_url = artwork_url.replace("large", "t500x500")
+            params = {
+                "q": query,
+                "limit": limit,
+                "linked_partitioning": "true",
+                "access": "playable"
+            }
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{API_URL}/tracks",
+                    headers={"Authorization": f"OAuth {token}"},
+                    params=params,
+                )
+
+            if response.status_code == 401:
+                print(f"SoundCloud API unauthorized (attempt {retry_count + 1}/{max_retries + 1})")
+                # Инвалидируем токен и пробуем снова
+                global access_token_cache, token_expires_at
+                access_token_cache = None
+                token_expires_at = 0
+                retry_count += 1
+                continue
                 
-                tracks.append({
-                    "id": t.get("id"),
-                    "title": t.get("title") or "Unknown Title",
-                    "artist": t.get("user", {}).get("username") or "Unknown Artist",
-                    "artist_permalink": t.get("user", {}).get("permalink_url"),
-                    "genre": t.get("genre"),
-                    "artwork": artwork_url,
-                    "permalink_url": t.get("permalink_url"),
-                    "duration": t.get("duration", 0),
-                    "access": t.get("access"),
-                })
+            if response.status_code != 200:
+                print(f"SoundCloud API error: {response.status_code} - {response.text}")
+                return None
 
-        return {"results": tracks}
+            data = response.json()
+        
+            if isinstance(data, dict):
+                if "collection" in data:
+                    data = data["collection"]
+                elif "errors" in data: 
+                    print(f"SoundCloud API errors: {data.get('errors')}")
+                    return None
+            
+            if not isinstance(data, list):
+                print(f"Unexpected data format: {type(data)}")
+                return None
+
+            tracks = []
+            for t in data:
+                if isinstance(t, dict) and t.get("access") == "playable" and t.get("id"):
+                    artwork_url = t.get("artwork_url")
+                    if artwork_url:
+                        artwork_url = artwork_url.replace("large", "t500x500")
+                    
+                    tracks.append({
+                        "id": t.get("id"),
+                        "title": t.get("title") or "Unknown Title",
+                        "artist": t.get("user", {}).get("username") or "Unknown Artist",
+                        "artist_permalink": t.get("user", {}).get("permalink_url"),
+                        "genre": t.get("genre"),
+                        "artwork": artwork_url,
+                        "permalink_url": t.get("permalink_url"),
+                        "duration": t.get("duration", 0),
+                        "access": t.get("access"),
+                    })
+
+            return {"results": tracks}
+        
+        except httpx.HTTPError as e:
+            print(f"HTTP error during SoundCloud search: {e}")
+            return None
+        except Exception as e:
+            print(f"Unexpected error during SoundCloud search: {e}")
+            return None
     
-    except httpx.HTTPError as e:
-        print(f"HTTP error during SoundCloud search: {e}")
-        return None
-    except Exception as e:
-        print(f"Unexpected error during SoundCloud search: {e}")
-        return None
+    print(f"All {max_retries + 1} attempts failed with 401 Unauthorized")
+    return None
 
 # async def _search_song_with_soundcloud(query: str) -> Union[dict, None]:
 #     """Асинхронная обёртка для поиска на SoundCloud"""
@@ -117,91 +134,105 @@ async def _search_song_with_soundcloud(query: str, limit: int) -> Union[dict, No
 
 async def _get_stream_url_with_soundcloud(track_id: int) -> Union[dict, None]:
     """
-    Получение URL для потокового воспроизведения трека
+    Получение URL для потокового воспроизведения трека с повторными попытками
     """
-    print(f"Getting stream URL for track {track_id}")
+    max_retries = 2
+    retry_count = 0
     
-    try:
-        token = await get_access_token()
+    while retry_count <= max_retries:
+        try:
+            token = await get_access_token()
 
-        # Сначала получаем информацию о треке
-        async with httpx.AsyncClient() as client:
-            track_resp = await client.get(
-                f"{API_URL}/tracks/{track_id}",
-                headers={"Authorization": f"OAuth {token}"},
-            )
+            # Сначала получаем информацию о треке
+            async with httpx.AsyncClient() as client:
+                track_resp = await client.get(
+                    f"{API_URL}/tracks/{track_id}",
+                    headers={"Authorization": f"OAuth {token}"},
+                )
 
-        if track_resp.status_code != 200:
-            print(f"SoundCloud track API error: {track_resp.status_code} - {track_resp.text}")
-            return None
-
-        track_data = track_resp.json()
-        print(f"Track data: {track_data}")
-
-        # Проверяем доступность трека
-        if track_data.get("access") != "playable":
-            print(f"Track {track_id} is not available for streaming")
-            return None
-
-        # Получаем stream URL через официальный endpoint
-        async with httpx.AsyncClient(follow_redirects=False) as client:
-            stream_resp = await client.get(
-                f"{API_URL}/tracks/{track_id}/stream",
-                headers={"Authorization": f"OAuth {token}"},
-            )
-
-        print(f"Stream response status: {stream_resp.status_code}")
-        print(f"Stream response headers: {dict(stream_resp.headers)}")
-
-        if stream_resp.status_code == 302:  # Редирект
-            # Получаем реальный MP3 URL из заголовка Location
-            stream_url = stream_resp.headers.get('location')
-            if not stream_url:
-                print(f"No redirect location found for track {track_id}")
+            if track_resp.status_code == 401:
+                print(f"SoundCloud track API unauthorized (attempt {retry_count + 1}/{max_retries + 1})")
+                global access_token_cache, token_expires_at
+                access_token_cache = None
+                token_expires_at = 0
+                retry_count += 1
+                continue
+                
+            if track_resp.status_code != 200:
+                print(f"SoundCloud track API error: {track_resp.status_code} - {track_resp.text}")
                 return None
-        elif stream_resp.status_code == 200:
-            # Если нет редиректа, парсим JSON
-            stream_data = stream_resp.json()
-            stream_url = stream_data.get("url")
-            if not stream_url:
-                print(f"No stream URL in response for track {track_id}")
-                return None
-        else:
-            print(f"SoundCloud stream API error: {stream_resp.status_code} - {stream_resp.text}")
-            return None
 
-        # Теперь получаем финальный URL (может быть еще один редирект)
-        async with httpx.AsyncClient(follow_redirects=False) as client:
-            final_resp = await client.get(stream_url)
-            
-            if final_resp.status_code == 302:
-                final_url = final_resp.headers.get('location')
+            track_data = track_resp.json()
+
+            # Проверяем доступность трека
+            if track_data.get("access") != "playable":
+                print(f"Track {track_id} is not available for streaming")
+                return None
+
+            # Получаем stream URL через официальный endpoint
+            async with httpx.AsyncClient(follow_redirects=False) as client:
+                stream_resp = await client.get(
+                    f"{API_URL}/tracks/{track_id}/stream",
+                    headers={"Authorization": f"OAuth {token}"},
+                )
+
+            if stream_resp.status_code == 401:
+                print(f"SoundCloud stream API unauthorized (attempt {retry_count + 1}/{max_retries + 1})")
+                access_token_cache = None
+                token_expires_at = 0
+                retry_count += 1
+                continue
+
+            if stream_resp.status_code == 302:  # Редирект
+                stream_url = stream_resp.headers.get('location')
+                if not stream_url:
+                    print(f"No redirect location found for track {track_id}")
+                    return None
+            elif stream_resp.status_code == 200:
+                stream_data = stream_resp.json()
+                stream_url = stream_data.get("url")
+                if not stream_url:
+                    print(f"No stream URL in response for track {track_id}")
+                    return None
             else:
-                final_url = stream_url
+                print(f"SoundCloud stream API error: {stream_resp.status_code} - {stream_resp.text}")
+                return None
 
-        if not final_url:
-            print(f"No final stream URL available for track {track_id}")
-            return None
+            # Получаем финальный URL
+            async with httpx.AsyncClient(follow_redirects=False) as client:
+                final_resp = await client.get(stream_url)
+                
+                if final_resp.status_code == 302:
+                    final_url = final_resp.headers.get('location')
+                else:
+                    final_url = stream_url
 
-        # Обрабатываем артворк
-        artwork_url = track_data.get("artwork_url")
-        if artwork_url:
-            artwork_url = artwork_url.replace("large", "t500x500")
+            if not final_url:
+                print(f"No final stream URL available for track {track_id}")
+                return None
 
-        return {
-            "stream_url": final_url,
-            "track_info": {
-                "title": track_data.get("title") or "Unknown Title",
-                "artist": track_data.get("user", {}).get("username") or "Unknown Artist",
-                "permalink_url": track_data.get("permalink_url"),
-                "artist_permalink": track_data.get("user", {}).get("permalink_url"),
-                "artwork": artwork_url
+            # Обрабатываем артворк
+            artwork_url = track_data.get("artwork_url")
+            if artwork_url:
+                artwork_url = artwork_url.replace("large", "t500x500")
+
+            return {
+                "stream_url": final_url,
+                "track_info": {
+                    "title": track_data.get("title") or "Unknown Title",
+                    "artist": track_data.get("user", {}).get("username") or "Unknown Artist",
+                    "permalink_url": track_data.get("permalink_url"),
+                    "artist_permalink": track_data.get("user", {}).get("permalink_url"),
+                    "artwork": artwork_url
+                }
             }
-        }
+        
+        except httpx.HTTPError as e:
+            print(f"HTTP error during SoundCloud stream retrieval: {e}")
+            return None
+        except Exception as e:
+            print(f"Unexpected error during SoundCloud stream retrieval: {e}")
+            return None
     
-    except httpx.HTTPError as e:
-        print(f"HTTP error during SoundCloud stream retrieval: {e}")
-        return None
-    except Exception as e:
-        print(f"Unexpected error during SoundCloud stream retrieval: {e}")
-        return None
+    print(f"All {max_retries + 1} attempts failed with 401 Unauthorized for track {track_id}")
+    return None
