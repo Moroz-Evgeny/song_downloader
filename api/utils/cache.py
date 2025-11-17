@@ -74,7 +74,7 @@ class CacheManager:
         cache_key = f"search:{query}:{limit}"
         
         # Сохраняем в in-memory кэш
-        search_cache[cache_key] = data
+        # search_cache[cache_key] = data
         
         # Сохраняем в Redis
         if redis_client:
@@ -114,7 +114,7 @@ class CacheManager:
         else:
             cache_data = data
         
-        stream_cache[cache_key] = cache_data
+        # stream_cache[cache_key] = cache_data
         
         if redis_client:
             try:
