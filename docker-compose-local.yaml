@@ -10,7 +10,7 @@ services:
     depends_on:
       - redis
     ports:
-      - "8080:8080"
+      - "80:80"
     volumes:
       # Монтируем существующие папки
       - ./db:/app/db
